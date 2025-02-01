@@ -11,9 +11,23 @@
       crossorigin="anonymous"
     />
     <style>
-      body { font-family: sans-serif; margin: 20px; }
-      #board { width: 400px; margin-bottom: 20px; }
-      #status { margin-top: 10px; }
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      #container {
+        display: flex;
+      }
+      #board {
+        width: 400px;
+      }
+      #ai-moves {
+        margin-left: 20px;
+        font-family: monospace;
+      }
+      #status {
+        margin-top: 10px;
+      }
     </style>
   </head>
   <body>
@@ -21,7 +35,12 @@
     <p>
       The AI (White) will move first. You are playing as Black (bottom). Drag your Black pieces to make your move.
     </p>
-    <div id="board"></div>
+    <div id="container">
+      <div id="board"></div>
+      <div id="ai-moves">
+        <!-- AI moves will appear here after each AI move. -->
+      </div>
+    </div>
     <div id="status"></div>
 
     <!-- Include chess.js for game logic -->
@@ -35,7 +54,7 @@
             integrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3QbPyX8kWyb93+8AC/pPWTzj+nHtbC5bxD"
             crossorigin="anonymous"></script>
     <script>
-      // Standard starting FEN with White to move.
+      // Start with the standard position and White to move.
       var initialFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
       var game = new Chess(initialFen);
 
@@ -45,7 +64,7 @@
         draggable: true,
         position: game.fen(),
         orientation: "black", // Board from Black's perspective.
-        // Use provided URLs for each piece.
+        // Use the provided piece URLs.
         pieceTheme: function(piece) {
           var pieces = {
             "wP": "https://upload.wikimedia.org/wikipedia/commons/0/04/Chess_plt60.png",
@@ -65,23 +84,19 @@
         },
         // Allow only Black pieces to be dragged.
         onDragStart: function(source, piece, position, orientation) {
-          // If game over or it's not Black's turn, prevent dragging.
           if (game.game_over() || game.turn() !== "b" || piece[0] !== "b") {
             return false;
           }
         },
         // Handle piece drops.
         onDrop: function(source, target) {
-          // Try to make the move.
           var move = game.move({
             from: source,
             to: target,
-            promotion: "q" // auto-promote to queen.
+            promotion: "q" // always promote to queen for simplicity.
           });
-          // Illegal move? Snap the piece back.
           if (move === null) return "snapback";
           updateStatus();
-          // After your move, allow the AI (White) to move after a short delay.
           window.setTimeout(aiMove, 250);
         },
         // Update board position after piece snap.
@@ -90,10 +105,8 @@
         }
       };
 
-      // Initialize the board.
       board = Chessboard("board", config);
 
-      // Update status message.
       function updateStatus() {
         var status = "";
         var moveColor = game.turn() === "b" ? "Black" : "White";
@@ -110,24 +123,41 @@
         document.getElementById("status").innerHTML = status;
       }
 
-      // AI move for White: choose the middle move from an alphabetically sorted list.
+      // AI move for White: display possible moves and choose the middle one.
       function aiMove() {
         if (game.game_over() || game.turn() !== "w") return;
         var moves = game.moves({ verbose: true });
         if (moves.length === 0) return;
+        // Create an array of SAN strings.
         var moveList = moves.map(function(m) { return m.san; });
-        moveList.sort();
+        // Sort the moves case-insensitively.
+        moveList.sort(function(a, b) {
+          return a.toLowerCase().localeCompare(b.toLowerCase());
+        });
         var mid = Math.floor(moveList.length / 2);
         var chosenSAN = moveList[mid];
+
+        // Build the HTML list of moves.
+        var html = "<p>AI possible moves:</p><ul>";
+        for (var i = 0; i < moveList.length; i++) {
+          if (i === mid) {
+            html += "<li><b>" + moveList[i] + "</b></li>";
+          } else {
+            html += "<li>" + moveList[i] + "</li>";
+          }
+        }
+        html += "</ul>";
+        document.getElementById("ai-moves").innerHTML = html;
+
+        // Make the chosen move.
         game.move(chosenSAN);
         board.position(game.fen());
         updateStatus();
       }
 
-      // Initial status update.
       updateStatus();
 
-      // If it's White's turn at start, have the AI move.
+      // Since AI (White) moves first, trigger its move on page load.
       if (game.turn() === "w") {
         window.setTimeout(aiMove, 500);
       }
